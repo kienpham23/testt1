@@ -52,16 +52,16 @@ public class ProductService {
     private ProductCategoryRepository productCategoryRepository;
     @Transactional(rollbackFor = Exception.class)
     public ProductReponDTO createProduct(ProductDTO dto, String createdBy) {
-        // Map các field cơ bản
+
         Product product = productMapper.toEntity(dto);
         product.setStatus("1");
         product.setCreatedBy(createdBy);
         product.setCreatedDate(LocalDateTime.now());
 
-        // Lưu tạm Product
+
         product = productRepository.save(product);
 
-        // Gán Category
+
         List<Category> categories = categoryRepository.findAllById(dto.getCategoryIds());
         List<ProductCategory> productCategories = new ArrayList<>();
         for (Category cat : categories) {
@@ -88,7 +88,7 @@ public class ProductService {
         }
         productImageRepository.saveAll(images);
 
-        // set vào entity
+
         product.setProductCategory(productCategories);
         product.setProductsimage(images);
 
@@ -131,7 +131,7 @@ public class ProductService {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Products");
 
-            // Header
+
             Row header = sheet.createRow(0);
             String[] columns = {"ID", "Tên", "Mã", "Giá", "Số lượng", "Ngày tạo", "Ngày sửa", "Danh mục"};
             for (int i = 0; i < columns.length; i++) {
@@ -139,7 +139,7 @@ public class ProductService {
                 cell.setCellValue(columns[i]);
             }
 
-            // Dữ liệu
+
             int rowIdx = 1;
             for (ProductRepoDTO dto : products) {
                 Row row = sheet.createRow(rowIdx++);
