@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import jakarta.servlet.http.HttpServletRequest;
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Locale;
@@ -22,12 +23,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(ResponseStatusException ex, HttpServletRequest request) {
         Locale locale = request.getLocale();
-        String message = messageSource.getMessage("category.notfound", null, locale);
+        String messageKey = ex.getReason();
+
+        String message = messageSource.getMessage(messageKey, null, messageKey, locale);
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", ex.getStatusCode().value());
         body.put("error", ex.getStatusCode().toString());
-        body.put("message", ex.getReason());
+        body.put("message", message);
         body.put("path", request.getRequestURI());
 
         return new ResponseEntity<>(body, ex.getStatusCode());

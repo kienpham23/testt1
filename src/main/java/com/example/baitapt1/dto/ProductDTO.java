@@ -14,27 +14,30 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductDTO {
-    @NotBlank(message = "Tên sản phẩm không được để trống")
-    @Size(max = 100, message = "Tên sản phẩm tối đa 100 ký tự")
-    private String name ;
-    @NotBlank(message = "Mã sản phẩm không được để trống")
-    @Size(max=50)
-    private String  productCode;
-    @Size(max = 200, message = "Mô tả sản phẩm tối đa 200 ký tự")
+    @NotBlank(message = "{product.name.notblank}")
+    @Size(max = 100, message = "{product.name.size.max}")
+    private String name;
+
+    @NotBlank(message = "{product.code.notblank}")
+    @Size(max = 50, message = "{product.code.size.max}")
+    private String productCode;
+
+    @Size(max = 200, message = "{product.description.size.max}")
     private String description;
 
-    @NotNull(message = "Giá không được để trống")
-    @PositiveOrZero(message = "Giá phải >= 0")
+    @NotNull(message = "{product.price.notnull}")
+    @PositiveOrZero(message = "{product.price.positive}")
     private double price;
 
-    @NotNull(message = "Số lượng không được để trống")
-    @Min(value = 0,message = "Số lượng phải >= 0")
+    @NotNull(message = "{product.quantity.notnull}")
+    @Min(value = 0, message = "{product.quantity.min}")
     private Long quantity;
 
-    @NotEmpty(message = "Danh sách loại sản phẩm không được để trống")
+    @NotEmpty(message = "{product.categoryIds.notempty}")
     private List<Long> categoryIds;
 
     private List<MultipartFile> image;
+
 
 
 }

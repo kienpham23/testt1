@@ -65,7 +65,7 @@ public class CategoryService {
         List<CategoryImage> categoryImages = new ArrayList<>();
         for (MultipartFile file : images) {
             String uuid = UUID.randomUUID().toString();
-            String url = fileStorageService.save(file, uuid); // viết riêng class lưu file
+            String url = fileStorageService.save(file, uuid);
 
             CategoryImage img = new CategoryImage();
             img.setName(category.getName());
@@ -144,13 +144,13 @@ public class CategoryService {
     public CategoryRepoDTO updateCategoryByCode(String categorycode, CategoryDTO dto) {
 
         if (dto.getName().length() > 100 || dto.getDescription().length() > 200) {
-            throw new RuntimeException("Tên hoặc mô tả vượt quá độ dài cho phép");
+            throw new RuntimeException("C.length.exceeded");
         }
 
 
         Category category = categoryRepository.findByCategoryCodeWithImages(categorycode)
                 .filter(c -> "1".equals(c.getStatus()))
-                .orElseThrow(() -> new RuntimeException("Category không tồn tại hoặc đã bị xóa mềm"));
+                .orElseThrow(() -> new RuntimeException("category.notfound.or.deleted"));
 
 
         category.setName(dto.getName());
@@ -166,7 +166,7 @@ public class CategoryService {
         if (dto.getImage() != null && !dto.getImage().isEmpty()) {
             List<CategoryImage> newImages = dto.getImage().stream().map(file -> {
                 String uuid = UUID.randomUUID().toString();
-                String url = fileStorageService.save(file, uuid); // lưu file và lấy link
+                String url = fileStorageService.save(file, uuid);
 
                 CategoryImage img = new CategoryImage();
                 img.setName(file.getOriginalFilename());
@@ -227,7 +227,7 @@ public class CategoryService {
                     .body(out.toByteArray());
 
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi xuất Excel", e);
+            throw new RuntimeException("pc.export.failed", e);
         }
     }
 
@@ -235,7 +235,7 @@ public class CategoryService {
     @Transactional
     public void softDelete(Long id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found with id = " + id));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "category.notfound.with.id"));
 
         category.setStatus("0");
         category.setModifiedDate(LocalDateTime.now());

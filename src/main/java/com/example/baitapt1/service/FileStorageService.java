@@ -20,7 +20,7 @@ public class FileStorageService {
             String fileName = uuid + extension;
             Path filePath = Paths.get(uploadDir).resolve(fileName);
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-            return "/files/" + fileName;  // url truy cập file, tùy cấu hình server
+            return "/files/" + fileName;
         } catch (IOException e) {
             throw new RuntimeException("Lỗi lưu file " + file.getOriginalFilename(), e);
         }

@@ -28,7 +28,6 @@ import java.util.Map;
 public class CategoryController {
     @Autowired
     CategoryService categoryService;
-    // Thêm mới category
     @PostMapping
     public ResponseEntity<CategoryRepoDTO> createCategory(
             @Valid @ModelAttribute CategoryDTO dto,

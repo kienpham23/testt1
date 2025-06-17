@@ -103,7 +103,7 @@ public class ProductService {
                 name, productCode, createdFrom, createdTo, categoryId, size, offset
         );
         if (results.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "category.notfound");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "product.notfound");
         }
 
 
@@ -162,21 +162,21 @@ public class ProductService {
                     .body(out.toByteArray());
 
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi xuất Excel: " + e.getMessage(), e);
+            throw new RuntimeException("pc.export.failed" , e);
         }
     }
     @Transactional
     public ProductReponDTO updateProduct(Long id, ProductDTO dto, String updatedBy) {
-        // 1. Kiểm tra sản phẩm tồn tại và đang hoạt động
-        Product product = productRepository.findByIdAndStatus(id, "1")
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Sản phẩm không tồn tại"));
 
-        // 2. Kiểm tra mã sản phẩm trùng
+        Product product = productRepository.findByIdAndStatus(id, "1")
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "product.notfound"));
+
+
         if (productRepository.existsByProductCodeAndIdNot(dto.getProductCode(), id)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mã sản phẩm đã tồn tại");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "product.code.exists");
         }
 
-        // 3. Cập nhật thông tin cơ bản (sử dụng native query hay setter tùy bạn)
+
         product.setName(dto.getName());
         product.setProductCode(dto.getProductCode());
         product.setDescription(dto.getDescription());
@@ -184,16 +184,16 @@ public class ProductService {
         product.setQuantity(dto.getQuantity());
         product.setModifiedBy(updatedBy);
         product.setModifiedDate(LocalDateTime.now());
-        productRepository.save(product); // nếu dùng setter thì phải gọi save
+        productRepository.save(product);
 
-        // 4. Cập nhật danh mục nếu có
+
         if (dto.getCategoryIds() != null && !dto.getCategoryIds().isEmpty()) {
             List<Long> newCategoryIds = dto.getCategoryIds();
 
-            // Xóa các liên kết không còn
+
             productCategoryRepository.deleteOldCategories(id, newCategoryIds);
 
-            // Thêm liên kết mới nếu chưa tồn tại
+
             for (Long categoryId : newCategoryIds) {
                 boolean categoryExists = categoryRepository.existsByIdAndStatus(categoryId, "1");
                 boolean linkExists = productCategoryRepository.existsByProductAndCategory(id, categoryId) > 0;
@@ -209,12 +209,12 @@ public class ProductService {
             }
         }
 
-        // 5. Xử lý ảnh nếu có gửi lên
+
         if (dto.getImage() != null && !dto.getImage().isEmpty()) {
-            // Soft delete ảnh cũ
+
             productImageRepository.deactivateOldImages(product.getId());
 
-            // Lưu ảnh mới
+
             List<ProductImage> newImages = dto.getImage().stream().map(file -> {
                 String uuid = UUID.randomUUID().toString();
                 String url = fileStorageService.save(file, uuid);
@@ -234,18 +234,19 @@ public class ProductService {
             product.setProductsimage(newImages);
         }
 
-        // 6. Trả về DTO phản hồi
+
         return productMapper.toResponse(product);
     }
     @Transactional
     public void softDeleteProduct(Long id, String updatedBy) {
         Integer updated = productRepository.softDelete(id, updatedBy);
+
         if (updated == 0) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Sản phẩm không tồn tại");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "product.notfound.with.id");
         }
+
+
     }
-
-
 }
 
 
