@@ -50,7 +50,7 @@ public class ProductService {
     private CategoryRepository categoryRepository;
     @Autowired
     private ProductCategoryRepository productCategoryRepository;
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ProductReponDTO createProduct(ProductDTO dto, String createdBy) {
         // Map các field cơ bản
         Product product = productMapper.toEntity(dto);
@@ -165,7 +165,7 @@ public class ProductService {
             throw new RuntimeException("pc.export.failed" , e);
         }
     }
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ProductReponDTO updateProduct(Long id, ProductDTO dto, String updatedBy) {
 
         Product product = productRepository.findByIdAndStatus(id, "1")
