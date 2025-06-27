@@ -25,7 +25,14 @@ public class GlobalExceptionHandler {
         Locale locale = request.getLocale();
         String messageKey = ex.getReason();
 
-        String message = messageSource.getMessage(messageKey, null, messageKey, locale);
+        // Nếu reason không phải là key hợp lệ => fallback luôn
+        String message;
+        try {
+            message = messageSource.getMessage(messageKey, null, locale);
+        } catch (Exception e) {
+            message = messageKey; // fallback về chuỗi gốc
+        }
+
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", ex.getStatusCode().value());

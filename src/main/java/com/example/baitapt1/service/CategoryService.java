@@ -2,20 +2,19 @@ package com.example.baitapt1.service;
 
 import com.example.baitapt1.dto.CategoryDTO;
 import com.example.baitapt1.dto.CategoryRepoDTO;
+import com.example.baitapt1.dto.CategorySearchRequest;
 import com.example.baitapt1.dto.ImageCategoryDTO;
 import com.example.baitapt1.entity.Category;
 import com.example.baitapt1.entity.CategoryImage;
 import com.example.baitapt1.mapper.CategoryRepoMapper;
 import com.example.baitapt1.repository.CategoryImageRepository;
 import com.example.baitapt1.repository.CategoryRepository;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -26,9 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -43,14 +40,14 @@ public class CategoryService {
     private CategoryImageRepository categoryImageRepository;
     @Autowired
     private FileStorageService fileStorageService;
+    @Autowired
+    private MessageSource messageSource;
 
-
-
-
+    // Giữ nguyên method tạo mới (có thể sửa để dùng DTO đúng nếu muốn)
     @Transactional
-    public CategoryRepoDTO Categorycode(CategoryDTO dto, List<MultipartFile>images, String createdBy) {
-        if(categoryRepository.existsByCategorycode(dto.getCategorycode())) {
-            throw new RuntimeException("Categorycode bị trùng");
+    public CategoryRepoDTO Categorycode(CategoryDTO dto) {
+        if (categoryRepository.existsByCategorycode(dto.getCategorycode())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "category.code.exists");
         }
         Category category = new Category();
         category.setName(dto.getName());
@@ -58,41 +55,40 @@ public class CategoryService {
         category.setDescription(dto.getDescription());
         category.setCreatedBy("admin");
 
-
-        categoryRepository.save(category);
-
+        categoryRepository.save(category); // cần lưu trước để lấy id liên kết ảnh
 
         List<CategoryImage> categoryImages = new ArrayList<>();
-        for (MultipartFile file : images) {
-            String uuid = UUID.randomUUID().toString();
-            String url = fileStorageService.save(file, uuid);
+        if (dto.getImage() != null && dto.getImage().length > 0) {
+            for (MultipartFile file : dto.getImage()) {
+                if (file != null && !file.isEmpty()) {
+                    String uuid = UUID.randomUUID().toString();
+                    String url = fileStorageService.save(file, uuid);
 
-            CategoryImage img = new CategoryImage();
-            img.setName(category.getName());
-            img.setUrl(url);
-            img.setUuid(uuid);
-            img.setCategory(category);
-            categoryImages.add(img);
+                    CategoryImage img = new CategoryImage();
+                    img.setName(file.getOriginalFilename());
+                    img.setUrl(url);
+                    img.setUuid(uuid);
+                    img.setCategory(category);
+                    categoryImages.add(img);
+                }
+            }
+            categoryImageRepository.saveAll(categoryImages);
+        category.setCategoryImage(categoryImages);
         }
 
-        // 5. Lưu ảnh
-        categoryImageRepository.saveAll(categoryImages);
-
-        // 6. Set ảnh lại vào category (nếu dùng fetch)
-        category.setCategoryImage(categoryImages);
-
-        // 7. Trả về DTO
         return categoryRepoMapper.toDTO(category);
-
-
     }
-    //Tìm kiếm
 
-    public Map<String, Object> searchCategories(String name, String categorycode,
-                                                LocalDateTime createdFrom, LocalDateTime createdTo,
-                                                Pageable pageable) {
 
-        Page<Category> page = categoryRepository.searchCategories(name, categorycode, createdFrom, createdTo, pageable);
+    // Tìm kiếm theo DTO gom param + phân trang
+    public Map<String, Object> searchCategories(CategorySearchRequest searchRequest, Pageable pageable) {
+        Page<Category> page = categoryRepository.searchCategories(
+                searchRequest.getName(),
+                searchRequest.getCategorycode(),
+                searchRequest.getCreatedFrom(),
+                searchRequest.getCreatedTo(),
+                pageable
+        );
 
         if (page.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "category.notfound");
@@ -128,8 +124,8 @@ public class CategoryService {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("data", data);
 
-        Map<String, Object> pagination = new HashMap<>();
-        pagination.put("currentPage", page.getNumber() + 1);
+        Map<String, Object> pagination = new LinkedHashMap<>();
+        pagination.put("currentPage", page.getNumber() );
         pagination.put("pageSize", page.getSize());
         pagination.put("totalElements", page.getTotalElements());
         pagination.put("totalPages", page.getTotalPages());
@@ -140,71 +136,24 @@ public class CategoryService {
         return response;
     }
 
-    @Transactional
-    public CategoryRepoDTO updateCategoryByCode(String categorycode, CategoryDTO dto) {
 
-        if (dto.getName().length() > 100 || dto.getDescription().length() > 200) {
-            throw new RuntimeException("C.length.exceeded");
-        }
+    public ResponseEntity<byte[]> exportCategoriesToExcel(CategorySearchRequest searchRequest) {
 
-
-        Category category = categoryRepository.findByCategoryCodeWithImages(categorycode)
-                .filter(c -> "1".equals(c.getStatus()))
-                .orElseThrow(() -> new RuntimeException("category.notfound.or.deleted"));
-
-
-        category.setName(dto.getName());
-        category.setDescription(dto.getDescription());
-        category.setCreatedBy("admin");
-
-        categoryRepository.save(category);
-
-
-        categoryImageRepository.deactivateOldImages(category.getId());
-
-
-        if (dto.getImage() != null && !dto.getImage().isEmpty()) {
-            List<CategoryImage> newImages = dto.getImage().stream().map(file -> {
-                String uuid = UUID.randomUUID().toString();
-                String url = fileStorageService.save(file, uuid);
-
-                CategoryImage img = new CategoryImage();
-                img.setName(file.getOriginalFilename());
-                img.setUrl(url);
-                img.setUuid(uuid);
-                img.setStatus("1");
-                img.setCategory(category);
-                return img;
-            }).collect(Collectors.toList());
-
-            categoryImageRepository.saveAll(newImages);
-
-
-            category.setCategoryImage(newImages);
-        }
-
-        return categoryRepoMapper.toDTO(category);
-    }
-    public ResponseEntity<byte[]> exportCategoriesToExcel(String name, String categorycode,
-                                                          LocalDateTime createdFrom, LocalDateTime createdTo) {
-
-
-        Pageable pageable = PageRequest.of(0, 10_000);
-        List<Category> categories = categoryRepository
-                .searchCategories(name, categorycode, createdFrom, createdTo, pageable)
-                .getContent();
+        List<Category> categories = categoryRepository.searchCategories(
+                searchRequest.getName(),
+                searchRequest.getCategorycode(),
+                searchRequest.getCreatedFrom(),
+                searchRequest.getCreatedTo()
+        );
 
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Categories");
 
-            // Header
-            Row header = sheet.createRow(0);
             String[] columns = {"ID", "Tên", "Mã", "Mô tả", "Ngày tạo", "Ngày sửa", "Người tạo", "Người sửa"};
+            Row header = sheet.createRow(0);
             for (int i = 0; i < columns.length; i++) {
-                Cell cell = header.createCell(i);
-                cell.setCellValue(columns[i]);
+                header.createCell(i).setCellValue(columns[i]);
             }
-
 
             int rowIdx = 1;
             for (Category c : categories) {
@@ -231,19 +180,66 @@ public class CategoryService {
         }
     }
 
+    // Cập nhật category theo categorycode
+    @Transactional
+    public CategoryRepoDTO updateCategoryByCode(String categorycode, CategoryDTO dto) {
+        Category category = categoryRepository.findByCategoryCodeWithImages(categorycode)
+                .filter(c -> "1".equals(c.getStatus()))
+                .orElseThrow(() -> new RuntimeException("category.notfound.or.deleted"));
 
+        category.setName(dto.getName());
+        category.setDescription(dto.getDescription());
+        category.setModifiedBy("admin");
+        category.setModifiedDate(LocalDateTime.now());
+        categoryRepository.save(category);
+
+        List<CategoryImage> currentImages = categoryImageRepository.findByCategoryIdAndStatus(category.getId(), "1");
+        Set<String> keepUuids = new HashSet<>(dto.getKeepImageUuids() != null ? dto.getKeepImageUuids() : List.of());
+
+        // Vô hiệu hóa ảnh không giữ lại
+        List<CategoryImage> toDeactivate = currentImages.stream()
+                .filter(img -> !keepUuids.contains(img.getUuid()))
+                .toList();
+        toDeactivate.forEach(img -> img.setStatus("0"));
+        categoryImageRepository.saveAll(toDeactivate);
+
+        // Lưu ảnh mới nếu có
+        if (dto.getImage() != null && dto.getImage().length > 0) {
+            List<CategoryImage> newImages = Arrays.stream(dto.getImage())
+                    .filter(file -> file != null && !file.isEmpty())
+                    .map(file -> {
+                        String uuid = UUID.randomUUID().toString();
+                        String url = fileStorageService.save(file, uuid);
+
+                        CategoryImage img = new CategoryImage();
+                        img.setName(file.getOriginalFilename());
+                        img.setUrl(url);
+                        img.setUuid(uuid);
+                        img.setStatus("1");
+                        img.setCategory(category);
+                        return img;
+                    })
+                    .toList();
+
+            categoryImageRepository.saveAll(newImages);
+        }
+
+
+        List<CategoryImage> updatedImages = categoryImageRepository.findByCategoryIdAndStatus(category.getId(), "1");
+        category.setCategoryImage(updatedImages);
+
+        return categoryRepoMapper.toDTO(category);
+    }
+
+    // Xóa mềm theo id
     @Transactional
     public void softDelete(Long id) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "category.notfound.with.id"));
+                .orElseThrow(() -> new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "category.notfound.with.id"));
 
         category.setStatus("0");
         category.setModifiedDate(LocalDateTime.now());
 
         categoryRepository.save(category);
-
     }
-
 }
-
-

@@ -36,6 +36,16 @@ public interface CategoryRepository extends JpaRepository <Category, Long> {
     Optional<Category> findByIdAndStatus(long id, String status);
 
     boolean existsBycategorycodeAndIdNot(String categorycode, long id);
+    @Query("SELECT c FROM Category c WHERE " +
+            "(:name IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :name, '%'))) AND " +
+            "(:categorycode IS NULL OR c.categorycode = :categorycode) AND " +
+            "(:createdFrom IS NULL OR c.createDate >= :createdFrom) AND " +
+            "(:createdTo IS NULL OR c.createDate <= :createdTo) AND " +
+            "c.status = '1'")
+    List<Category> searchCategories(@Param("name") String name,
+                                    @Param("categorycode") String categorycode,
+                                    @Param("createdFrom") LocalDateTime createdFrom,
+                                    @Param("createdTo") LocalDateTime createdTo);
     @Modifying
     @Query("UPDATE Category c SET c.name = :name,  c.description = :description, c.modifiedDate = CURRENT_TIMESTAMP WHERE c.categorycode = :categorycode AND c.status = '1'")
     int updateCategory(@Param("name") String name,

@@ -17,5 +17,6 @@ public interface CategoryImageRepository extends JpaRepository<CategoryImage, In
     @Modifying
     @Query("UPDATE CategoryImage ci SET ci.status = '0' WHERE ci.category.id = :categoryId AND ci.status = '1'")
     void deactivateOldImages(@Param("categoryId") Long categoryId);
+    List<CategoryImage> findByCategoryIdAndStatus(Long categoryId, String status);
 
 }

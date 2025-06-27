@@ -2,23 +2,21 @@ package com.example.baitapt1.controller;
 
 
 import com.example.baitapt1.dto.ProductDTO;
-import com.example.baitapt1.dto.ProductRepoDTO;
+
 import com.example.baitapt1.dto.ProductReponDTO;
-import com.example.baitapt1.entity.Product;
+import com.example.baitapt1.dto.ProductSearchRequest;
+
 import com.example.baitapt1.mapper.ProductMapper;
 import com.example.baitapt1.repository.ProductRepository;
 import com.example.baitapt1.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.Map;
 
 
@@ -32,50 +30,39 @@ public class ProductCotroller {
     @Autowired
     ProductMapper productMapper;
     @PostMapping
-    public ResponseEntity<ProductReponDTO> createProduct(
-            @Valid @ModelAttribute ProductDTO productDTO,
-            @RequestParam String createdBy) {
-
-        ProductReponDTO result = productService.createProduct(productDTO, createdBy);
-        return new ResponseEntity<>(result, HttpStatus.CREATED);
+    public ResponseEntity<ProductReponDTO> createProduct(@ModelAttribute @Valid ProductDTO dto) {
+        ProductReponDTO result = productService.createProduct(dto, "admin");
+        return ResponseEntity.ok(result);
     }
     @GetMapping("/search")
     public ResponseEntity<?> searchProducts(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String productCode,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdTo,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        Map<String, Object> response = productService.searchProducts(
-                name, productCode, createdFrom, createdTo, categoryId, page, size
+            @ModelAttribute ProductSearchRequest searchRequest,
+            @PageableDefault(page = 0, size = 10)
+            Pageable pageable) {
+
+        Map<String, Object> result = productService.searchProducts(
+                searchRequest.getName(),
+                searchRequest.getProductCode(),
+                searchRequest.getCreatedFrom(),
+                searchRequest.getCreatedTo(),
+                searchRequest.getCategoryId(),
+                pageable
         );
-        return ResponseEntity.ok(response);
+
+        return ResponseEntity.ok(result);
     }
     @GetMapping("/export")
-    public ResponseEntity<byte[]> exportExcel(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String productCode,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdTo,
-            @RequestParam(required = false) Long categoryId
-    ) {
-        return productService.exportProductsToExcel(name, productCode, createdFrom, createdTo, categoryId);
+    public ResponseEntity<byte[]> exportExcel(@ModelAttribute ProductSearchRequest searchRequest) {
+        return productService.exportProductsToExcel(searchRequest);
     }
     @PutMapping("/{id}")
-    public ResponseEntity<ProductReponDTO> updateProduct(
-            @PathVariable Long id,
-            @ModelAttribute ProductDTO dto,
-            @RequestHeader(name = "updatedBy", defaultValue = "admin") String updatedBy
-    ) {
-        ProductReponDTO updatedProduct = productService.updateProduct(id, dto, updatedBy);
-        return ResponseEntity.ok(updatedProduct);
+    public ResponseEntity<ProductReponDTO> updateProduct(@PathVariable Long id,
+                                                         @Valid @ModelAttribute ProductDTO dto) {
+        return ResponseEntity.ok(productService.updateProduct(id, dto, dto.getUpdatedBy()));
     }
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
-        productService.softDeleteProduct(id, "admin"); // bạn truyền user hiện tại nếu có
+        productService.softDeleteProduct(id, "admin");
         return ResponseEntity.ok().build();
     }
 
